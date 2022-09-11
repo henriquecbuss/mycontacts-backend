@@ -1,4 +1,5 @@
 const ContactRepository = require('../repositories/ContactRepository')
+const CategoryRepository = require('../repositories/CategoryRepository')
 const isValidUUID = require('../utils/isValidUUID')
 
 class ContactController {
@@ -100,7 +101,13 @@ class ContactController {
       categoryId: categoryId || null
     })
 
-    response.json(contact)
+    if (contact.category_id) {
+      const category = await CategoryRepository.findById(contact.category_id)
+
+      contact.category_name = category.name
+    }
+
+    response.json(controller.mergeCategory(contact))
   }
 
   async delete (request, response) {
