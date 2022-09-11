@@ -1,11 +1,12 @@
 const ContactRepository = require('../repositories/ContactRepository')
+const isValidUUID = require('../utils/isValidUUID')
 
 class ContactController {
   mergeCategory (contact) {
     const { category_name: categoryName, category_id: categoryId, ...rest } = contact
     const category =
-        (categoryName && categoryId && { name: categoryName, id: categoryId }) ||
-        null
+      (categoryName && categoryId && { name: categoryName, id: categoryId }) ||
+      null
 
     return {
       category,
@@ -23,10 +24,14 @@ class ContactController {
   async show (request, response) {
     const { id } = request.params
 
+    if (!isValidUUID(id)) {
+      return response.status(400).json({ error: 'Invalid contact ID' })
+    }
+
     const contact = await ContactRepository.findById(id)
 
     if (!contact) {
-      return response.status(404).json({ error: 'User not found' })
+      return response.status(404).json({ error: 'Contact not found' })
     }
 
     response.json(controller.mergeCategory(contact))
@@ -39,12 +44,23 @@ class ContactController {
       return response.status(400).json({ error: 'Name is required' })
     }
 
-    const emailExists = await ContactRepository.findByEmail(email)
-    if (emailExists) {
-      return response.status(400).json({ error: 'Email already taken' })
+    if (categoryId && !isValidUUID(categoryId)) {
+      return response.status(400).json({ error: 'Invalid category ID' })
     }
 
-    const newContact = await ContactRepository.create({ name, email, phone, categoryId })
+    if (email) {
+      const emailExists = await ContactRepository.findByEmail(email)
+      if (emailExists) {
+        return response.status(400).json({ error: 'Email already taken' })
+      }
+    }
+
+    const newContact = await ContactRepository.create({
+      name,
+      email: email || null,
+      phone: phone || null,
+      categoryId: categoryId || null
+    })
 
     response.status(201).json(newContact)
   }
@@ -53,25 +69,35 @@ class ContactController {
     const { id } = request.params
     const { name, email, phone, category_id: categoryId } = request.body
 
-    const contactExists = await ContactRepository.findById(id)
-    if (!contactExists) {
-      return response.status(404).json({ error: 'User not found' })
+    if (!isValidUUID(id)) {
+      return response.status(400).json({ error: 'Invalid contact ID' })
+    }
+
+    if (categoryId && !isValidUUID(categoryId)) {
+      return response.status(400).json({ error: 'Invalid category ID' })
     }
 
     if (!name) {
       return response.status(400).json({ error: 'Name is required' })
     }
 
-    const contactByEmail = await ContactRepository.findByEmail(email)
-    if (contactByEmail && contactByEmail.id !== id) {
-      return response.status(400).json({ error: 'Email already taken' })
+    const contactExists = await ContactRepository.findById(id)
+    if (!contactExists) {
+      return response.status(404).json({ error: 'Contact not found' })
+    }
+
+    if (email) {
+      const contactByEmail = await ContactRepository.findByEmail(email)
+      if (contactByEmail && contactByEmail.id !== id) {
+        return response.status(400).json({ error: 'Email already taken' })
+      }
     }
 
     const contact = await ContactRepository.update(id, {
       name,
-      email,
-      phone,
-      categoryId
+      email: email || null,
+      phone: phone || null,
+      categoryId: categoryId || null
     })
 
     response.json(contact)
@@ -79,6 +105,10 @@ class ContactController {
 
   async delete (request, response) {
     const { id } = request.params
+
+    if (!isValidUUID(id)) {
+      return response.status(400).json({ error: 'Invalid contact ID' })
+    }
 
     await ContactRepository.delete(id)
 
